@@ -3,13 +3,14 @@ package middleware
 import (
 	"FitByte/pkg/log"
 	"fmt"
+	"strings"
+
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
-	"strings"
 )
 
 type AppClaims struct {
-	UserID float64 `json:"user_id"`
+	UserID int64 `json:"user_id"`
 	jwt.RegisteredClaims
 }
 
@@ -39,7 +40,7 @@ func AuthMiddleware(secretKey string) gin.HandlerFunc {
 			return
 		}
 
-		log.Logger.Info().Float64("user_id", claims.UserID).Msg("Authenticated request")
+		log.Logger.Info().Int64("user_id", claims.UserID).Msg("Authenticated request")
 		c.Set("user_id", claims.UserID)
 		c.Next()
 	}

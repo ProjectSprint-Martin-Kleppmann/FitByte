@@ -4,12 +4,13 @@ import (
 	"FitByte/configs"
 	"FitByte/internal/handlers"
 	"FitByte/internal/infrastructure"
+	"FitByte/internal/middleware"
 	"FitByte/internal/repositories"
 	"FitByte/internal/service"
 
-	"github.com/gin-gonic/gin"
-
 	"FitByte/pkg/log"
+
+	"github.com/gin-gonic/gin"
 )
 
 func main() {
@@ -22,14 +23,22 @@ func main() {
 	)
 
 	db := infrastructure.InitDB(appConfig)
+	minioClient := infrastructure.InitMinioStorage(appConfig)
 
 	r := gin.Default()
 	r.Use(gin.Recovery())
+	r.Use(middleware.RequestLogger())
 
 	userRepo := repositories.NewUserRepository(db)
 	userService := service.NewUserService(appConfig, userRepo)
 	userHandler := handlers.NewUserHandler(r, appConfig, userService)
 	userHandler.SetupRoutes()
+
+	minioRepo := repositories.NewMinioRepository(minioClient, appConfig.Minio.Bucket)
+	fileRepo := repositories.NewFileRepository(db)
+	fileService := service.NewFileService(fileRepo, minioRepo)
+	fileHandler := handlers.NewFileHandler(r, appConfig, fileService)
+	fileHandler.SetupRoutes()
 
 	log.Logger.Info().Str("port", appConfig.App.Port).Msg("Starting server")
 	if err := r.Run(":" + appConfig.App.Port); err != nil {
