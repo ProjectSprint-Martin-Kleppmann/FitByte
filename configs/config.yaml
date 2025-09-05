@@ -10,3 +10,10 @@ database:
 
 secret:
   jwt_secret: "secret"
+
+minio:
+  endpoint: "localhost:9000"
+  access_key_id: "minioadmin"
+  secret_access_key: "minioadmin"
+  use_ssl: false
+  bucket: "fitbyte"

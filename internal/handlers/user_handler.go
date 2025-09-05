@@ -28,16 +28,15 @@ func NewUserHandler(engine *gin.Engine, appConfig configs.Config, userService se
 }
 
 func (h *UserHandler) SetupRoutes() {
-	// Public routes
-	h.Engine.Use(middleware.RequestLogger())
+	// Health check
+	h.Engine.GET("/ping", h.pong)
 
-	routes := h.Engine.Group("/user")
+	routes := h.Engine.Group("/v1")
 	routes.POST("register", h.Register)
 	routes.POST("login", h.Login)
-	routes.GET("ping", h.pong)
 
 	// Protected routes
-	privateRoutes := h.Engine.Group("/user")
+	privateRoutes := h.Engine.Group("/health")
 	privateRoutes.Use(middleware.AuthMiddleware(h.AppConfig.Secret.JWTSecret))
 	privateRoutes.GET("private-ping", h.pong)
 }
