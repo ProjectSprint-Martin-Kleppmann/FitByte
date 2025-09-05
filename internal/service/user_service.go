@@ -8,6 +8,7 @@ import (
 	"FitByte/pkg/log"
 	"FitByte/pkg/token"
 	"context"
+
 	"golang.org/x/crypto/bcrypt"
 )
 

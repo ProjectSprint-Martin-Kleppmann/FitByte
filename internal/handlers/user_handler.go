@@ -34,7 +34,6 @@ func (h *UserHandler) SetupRoutes() {
 	routes := h.Engine.Group("/v1")
 	routes.POST("register", h.Register)
 	routes.POST("login", h.Login)
-	routes.GET("ping", h.pong)
 
 	// Protected routes
 	privateRoutes := h.Engine.Group("/health")
