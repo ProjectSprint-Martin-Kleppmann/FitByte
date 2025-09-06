@@ -13,21 +13,21 @@ import (
 	customErrors "FitByte/internal/errors"
 )
 
-type UserHandler struct {
-	Engine    *gin.Engine
-	AppConfig configs.Config
-	UserSvc   service.UserService
+type ProfileHandler struct {
+	Engine     *gin.Engine
+	AppConfig  configs.Config
+	ProfileSvc service.ProfileService
 }
 
-func NewUserHandler(engine *gin.Engine, appConfig configs.Config, userService service.UserService) *UserHandler {
-	return &UserHandler{
-		Engine:    engine,
-		AppConfig: appConfig,
-		UserSvc:   userService,
+func NewProfileHandler(engine *gin.Engine, appConfig configs.Config, profileService service.ProfileService) *ProfileHandler {
+	return &ProfileHandler{
+		Engine:     engine,
+		AppConfig:  appConfig,
+		ProfileSvc: profileService,
 	}
 }
 
-func (h *UserHandler) SetupRoutes() {
+func (h *ProfileHandler) SetupRoutes() {
 	// Health check
 	h.Engine.GET("/ping", h.pong)
 
@@ -41,14 +41,14 @@ func (h *UserHandler) SetupRoutes() {
 	privateRoutes.GET("private-ping", h.pong)
 }
 
-func (h *UserHandler) pong(c *gin.Context) {
+func (h *ProfileHandler) pong(c *gin.Context) {
 	c.JSON(200, gin.H{
 		"message": "pong",
 	})
 }
 
-func (h *UserHandler) Register(c *gin.Context) {
-	var model models.User
+func (h *ProfileHandler) Register(c *gin.Context) {
+	var model models.AuthRequest
 	ctx := c.Request.Context()
 	err := c.ShouldBindJSON(&model)
 	if err != nil {
@@ -56,7 +56,7 @@ func (h *UserHandler) Register(c *gin.Context) {
 		return
 	}
 
-	response, err := h.UserSvc.Register(ctx, model)
+	response, err := h.ProfileSvc.Register(ctx, model)
 	if err != nil {
 		if errors.Is(customErrors.ErrUserAlreadyExists, err) {
 			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
@@ -69,8 +69,8 @@ func (h *UserHandler) Register(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"email": response.Email, "token": response.Token})
 }
 
-func (h *UserHandler) Login(c *gin.Context) {
-	var model models.User
+func (h *ProfileHandler) Login(c *gin.Context) {
+	var model models.AuthRequest
 	ctx := c.Request.Context()
 
 	err := c.ShouldBindJSON(&model)
@@ -79,7 +79,7 @@ func (h *UserHandler) Login(c *gin.Context) {
 		return
 	}
 
-	token, err := h.UserSvc.Login(ctx, model)
+	token, err := h.ProfileSvc.Login(ctx, model)
 	if err != nil {
 		if errors.Is(err, customErrors.ErrInvalidCredentials) {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
