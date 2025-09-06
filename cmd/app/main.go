@@ -29,10 +29,10 @@ func main() {
 	r.Use(gin.Recovery())
 	r.Use(middleware.RequestLogger())
 
-	userRepo := repositories.NewUserRepository(db)
-	userService := service.NewUserService(appConfig, userRepo)
-	userHandler := handlers.NewUserHandler(r, appConfig, userService)
-	userHandler.SetupRoutes()
+	profileRepo := repositories.NewProfileRepository(db)
+	profileService := service.NewProfileService(appConfig, profileRepo)
+	profileHandler := handlers.NewProfileHandler(r, appConfig, profileService)
+	profileHandler.SetupRoutes()
 
 	minioRepo := repositories.NewMinioRepository(minioClient, appConfig.Minio.Bucket)
 	fileRepo := repositories.NewFileRepository(db)
