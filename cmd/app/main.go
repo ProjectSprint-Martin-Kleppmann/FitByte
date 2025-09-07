@@ -40,6 +40,11 @@ func main() {
 	fileHandler := handlers.NewFileHandler(r, appConfig, fileService)
 	fileHandler.SetupRoutes()
 
+	activityRepo := repositories.NewActivityRepository(db)
+	activityService := service.NewActivityService(activityRepo)
+	activityHandler := handlers.NewActivityHandler(r, appConfig, activityService)
+	activityHandler.SetupRoutes()
+
 	log.Logger.Info().Str("port", appConfig.App.Port).Msg("Starting server")
 	if err := r.Run(":" + appConfig.App.Port); err != nil {
 		log.Logger.Fatal().Err(err).Msg("Failed to start server")
