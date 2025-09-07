@@ -26,13 +26,13 @@ type Profile struct {
 }
 
 type PatchProfileRequest struct {
-	Preference  *string  `json:"preference,omitempty" validate:"omitempty,oneof=CARDIO WEIGHT"`
-	WeightUnit  *string  `json:"weightUnit,omitempty" validate:"omitempty,oneof=KG LBS"`
-	HeightUnit  *string  `json:"heightUnit,omitempty" validate:"omitempty,oneof=CM INCH"`
-	Weight      *float64 `json:"weight,omitempty" validate:"omitempty,min=10,max=1000"`
-	Height      *float64 `json:"height,omitempty" validate:"omitempty,min=3,max=250"`
-	Name        *string  `json:"name,omitempty" validate:"omitempty,min=2,max=60"`
-	ImageURI    *string  `json:"imageUri,omitempty" validate:"omitempty,url"`
+	Preference  *string  `json:"preference" validate:"required,oneof=CARDIO WEIGHT"`
+	WeightUnit  *string  `json:"weightUnit" validate:"required,oneof=KG LBS"`
+	HeightUnit  *string  `json:"heightUnit" validate:"required,oneof=CM INCH"`
+	Weight      *float64 `json:"weight" validate:"required,min=10,max=1000"`
+	Height      *float64 `json:"height" validate:"required,min=3,max=250"`
+	Name        *string  `json:"name" validate:"omitempty,min=2,max=60"`
+	ImageURI    *string  `json:"imageUri" validate:"omitempty,url"`
 }
 
 type ProfileResponse struct {
