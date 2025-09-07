@@ -123,13 +123,13 @@ func (h *ProfileHandler) UpdateProfile(c *gin.Context) {
 		dbField string
 		value   interface{}
 	}{
-		"Preference":  {"preference", getPtrValue(req.Preference)},
-		"WeightUnit":  {"weight_unit", getPtrValue(req.WeightUnit)},
-		"HeightUnit":  {"height_unit", getPtrValue(req.HeightUnit)},
-		"Weight":      {"weight", getPtrValue(req.Weight)},
-		"Height":      {"height", getPtrValue(req.Height)},
-		"Name":        {"name", getPtrValue(req.Name)},
-		"ImageUri":    {"image_uri", getPtrValue(req.ImageURI)},
+		"Preference":  {"preference", req.Preference},
+		"WeightUnit":  {"weight_unit", req.WeightUnit},
+		"HeightUnit":  {"height_unit", req.HeightUnit},
+		"Weight":      {"weight", req.Weight},
+		"Height":      {"height", req.Height},
+		"Name":        {"name", req.Name},
+		"ImageUri":    {"image_uri", req.ImageURI},
 	}
 
 	updates := make(map[string]interface{})
@@ -149,42 +149,28 @@ func (h *ProfileHandler) UpdateProfile(c *gin.Context) {
 		return
 	}
 
-	profile, err := h.ProfileSvc.GetProfile(ctx, userID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve profile"})
-		return
-	}
-	if profile == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
-		return
-	}
-
-	response := models.ProfileResponse{
-		Preference: profile.Preference,
-		WeightUnit: profile.WeightUnit,
-		HeightUnit: profile.HeightUnit,
-		Weight:     profile.Weight,
-		Height:     profile.Height,
-		Name:       profile.Name,
-		ImageURI:   profile.ImageURI,
-	}
-
-	c.JSON(http.StatusOK, response)
+	c.JSON(http.StatusOK, gin.H{
+		"preference":  getStringValue(req.Preference),
+		"weightUnit":  getStringValue(req.WeightUnit),
+		"heightUnit":  getStringValue(req.HeightUnit),
+		"weight":      getFloat64Value(req.Weight),
+		"height":      getFloat64Value(req.Height),
+		"name":        getStringValue(req.Name),
+		"imageUri":    getStringValue(req.ImageURI),
+	})
 }
 
-func getPtrValue(v interface{}) interface{} {
-	switch val := v.(type) {
-	case *string:
-		if val != nil {
-			return *val
-		}
-		return ""
-	case *float64:
-		if val != nil {
-			return *val
-		}
-		return 0.0
-	default:
-		return nil
+// helper
+func getStringValue(ptr *string) string {
+	if ptr != nil {
+		return *ptr
 	}
+	return ""
+}
+
+func getFloat64Value(ptr *float64) float64 {
+	if ptr != nil {
+		return *ptr
+	}
+	return 0
 }
