@@ -19,12 +19,14 @@ migrate-up:
 	@echo "Applying migrations..."
 	@docker exec -i fitByte-postgres psql -U $(DB_USER) -d $(DB_NAME) < scripts/migrations/000003_profile-table.up.sql
 	@docker exec -i fitByte-postgres psql -U $(DB_USER) -d $(DB_NAME) < scripts/migrations/000002_create-file-table.up.sql
+	@docker exec -i fitByte-postgres psql -U $(DB_USER) -d $(DB_NAME) < scripts/migrations/000004_create-activity-table.up.sql
 
 # Target for reverting migrations
 migrate-down:
 	@echo "Reverting migrations..."
-	@docker exec -i fitByte-postgres psql -U $(DB_USER) -d $(DB_NAME) < scripts/migrations/000003_profile-table.down.sql
+	@docker exec -i fitByte-postgres psql -U $(DB_USER) -d $(DB_NAME) < scripts/migrations/000004_create-activity-table.down.sql
 	@docker exec -i fitByte-postgres psql -U $(DB_USER) -d $(DB_NAME) < scripts/migrations/000002_create-file-table.down.sql
+	@docker exec -i fitByte-postgres psql -U $(DB_USER) -d $(DB_NAME) < scripts/migrations/000003_profile-table.down.sql
 
 # Target for dropping database (force disconnect users first)
 drop-db:
