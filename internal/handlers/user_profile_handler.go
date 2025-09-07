@@ -36,9 +36,10 @@ func (h *ProfileHandler) SetupRoutes() {
 	routes.POST("login", h.Login)
 
 	// Protected routes
-	privateRoutes := h.Engine.Group("/health")
+	privateRoutes := h.Engine.Group("/v1")
 	privateRoutes.Use(middleware.AuthMiddleware(h.AppConfig.Secret.JWTSecret))
 	privateRoutes.GET("private-ping", h.pong)
+	privateRoutes.GET("user", h.User)
 }
 
 func (h *ProfileHandler) pong(c *gin.Context) {
@@ -97,4 +98,38 @@ func (h *ProfileHandler) Login(c *gin.Context) {
 		"email": model.Email,
 		"token": token,
 	})
+}
+
+func (h *ProfileHandler) User(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	profile, err := h.ProfileSvc.GetProfileByID(ctx, userID.(int64))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	if profile == nil {
+		c.JSON(http.StatusOK, models.ProfileResponse{})
+		return
+	}
+
+	resp := models.ProfileResponse{
+		Email:      profile.Email,
+		Name:       profile.Name,
+		ImageURI:   profile.ImageURI,
+		Preference: profile.Preference,
+		WeightUnit: profile.WeightUnit,
+		HeightUnit: profile.HeightUnit,
+		Weight:     &profile.Weight,
+		Height:     &profile.Height,
+	}
+
+	c.JSON(http.StatusOK, resp)
 }

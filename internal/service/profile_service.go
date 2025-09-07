@@ -15,6 +15,7 @@ import (
 type ProfileService interface {
 	Register(ctx context.Context, authRequest models.AuthRequest) (models.RegisterResponse, error)
 	Login(ctx context.Context, authRequest models.AuthRequest) (string, error)
+	GetProfileByID(ctx context.Context, id int64) (*models.Profile, error)
 }
 
 type profileService struct {
@@ -32,7 +33,7 @@ func NewProfileService(appConfig configs.Config, profileRepo repositories.Profil
 func (u *profileService) Register(ctx context.Context, authRequest models.AuthRequest) (models.RegisterResponse, error) {
 	isUserExist, err := u.profileRepo.GetProfileByEmail(ctx, authRequest.Email)
 	if err != nil {
-		log.Logger.Error().Err(err).Msg("error occurred on Register(ctx context.Context, authRequest models.AuthRequest")
+		log.Logger.Error().Err(err).Msg("error occurred on Register")
 		return models.RegisterResponse{}, err
 	}
 
@@ -43,7 +44,7 @@ func (u *profileService) Register(ctx context.Context, authRequest models.AuthRe
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(authRequest.Password), bcrypt.DefaultCost)
 	if err != nil {
-		log.Logger.Error().Err(err).Msg("error occurred on Register(ctx context.Context, authRequest models.AuthRequest")
+		log.Logger.Error().Err(err).Msg("error occurred on Register")
 		return models.RegisterResponse{}, err
 	}
 
@@ -54,13 +55,13 @@ func (u *profileService) Register(ctx context.Context, authRequest models.AuthRe
 
 	err = u.profileRepo.CreateUser(ctx, userProfile)
 	if err != nil {
-		log.Logger.Error().Err(err).Msg("error occurred on Register(ctx context.Context, authRequest models.AuthRequest")
+		log.Logger.Error().Err(err).Msg("error occurred on Register")
 		return models.RegisterResponse{}, err
 	}
 
 	signedToken, err := token.GenerateJWTToken(userProfile.ID, userProfile.Email, u.appConfig.Secret.JWTSecret)
 	if err != nil {
-		log.Logger.Error().Err(err).Msg("error occurred on Register(ctx context.Context, authRequest models.AuthRequest")
+		log.Logger.Error().Err(err).Msg("error occurred on Register")
 		return models.RegisterResponse{}, err
 	}
 
@@ -73,7 +74,7 @@ func (u *profileService) Register(ctx context.Context, authRequest models.AuthRe
 func (u *profileService) Login(ctx context.Context, authRequest models.AuthRequest) (string, error) {
 	userDetail, err := u.profileRepo.GetProfileByEmail(ctx, authRequest.Email)
 	if err != nil {
-		log.Logger.Error().Err(err).Msg("error occurred on Login(ctx context.Context, authRequest models.AuthRequest")
+		log.Logger.Error().Err(err).Msg("error occurred on Login")
 		return "", err
 	}
 
@@ -90,9 +91,13 @@ func (u *profileService) Login(ctx context.Context, authRequest models.AuthReque
 
 	signedToken, err := token.GenerateJWTToken(userDetail.ID, userDetail.Email, u.appConfig.Secret.JWTSecret)
 	if err != nil {
-		log.Logger.Error().Err(err).Msg("error occurred on Login(ctx context.Context, authRequest models.AuthRequest")
+		log.Logger.Error().Err(err).Msg("error occurred on Login")
 		return "", err
 	}
 
 	return signedToken, nil
+}
+
+func (u *profileService) GetProfileByID(ctx context.Context, id int64) (*models.Profile, error) {
+	return u.profileRepo.GetProfileByID(ctx, id)
 }

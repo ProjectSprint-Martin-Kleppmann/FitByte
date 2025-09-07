@@ -24,3 +24,14 @@ type Profile struct {
 	Weight     float64 `json:"weight" validate:"omitempty,min=0,max=999.99"`
 	Height     float64 `json:"height" validate:"omitempty,min=0,max=999.99"`
 }
+
+type ProfileResponse struct {
+	Email      string   `json:"email"`
+	Name       string   `json:"name"`
+	ImageURI   string   `json:"imageUri"`
+	Preference string   `json:"preference"`
+	WeightUnit string   `json:"weightUnit"`
+	HeightUnit string   `json:"heightUnit"`
+	Weight     *float64 `json:"weight"`
+	Height     *float64 `json:"height"`
+}

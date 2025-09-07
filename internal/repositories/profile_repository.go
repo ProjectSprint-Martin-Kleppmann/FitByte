@@ -2,17 +2,17 @@ package repositories
 
 import (
 	"FitByte/internal/models"
+	"FitByte/pkg/log"
 	"context"
 	"errors"
 
 	"gorm.io/gorm"
-
-	"FitByte/pkg/log"
 )
 
 type ProfileRepository interface {
 	CreateUser(ctx context.Context, profile models.Profile) error
 	GetProfileByEmail(ctx context.Context, email string) (*models.Profile, error)
+	GetProfileByID(ctx context.Context, id int64) (*models.Profile, error)
 }
 
 type profileRepository struct {
@@ -40,6 +40,19 @@ func (r *profileRepository) GetProfileByEmail(ctx context.Context, email string)
 			return nil, nil
 		}
 		log.Logger.Error().Err(err).Msg("Failed to get profile by email")
+		return nil, err
+	}
+	return &profile, nil
+}
+
+func (r *profileRepository) GetProfileByID(ctx context.Context, id int64) (*models.Profile, error) {
+	var profile models.Profile
+	err := r.db.Table("profiles").WithContext(ctx).Where("id = ?", id).First(&profile).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		log.Logger.Error().Err(err).Msg("Failed to get profile by ID")
 		return nil, err
 	}
 	return &profile, nil
