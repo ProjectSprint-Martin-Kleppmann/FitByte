@@ -42,5 +42,6 @@ type ProfileResponse struct {
 	Weight      float64 `json:"weight"`
 	Height      float64 `json:"height"`
 	Name        string  `json:"name"`
+	Email       string  `json:"email,omitempty"`
 	ImageURI    string  `json:"imageUri"`
 }
