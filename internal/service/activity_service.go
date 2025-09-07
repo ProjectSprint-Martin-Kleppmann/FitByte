@@ -1,10 +1,10 @@
 package service
 
 import (
+	customErrors "FitByte/internal/errors"
 	"FitByte/internal/models"
 	"FitByte/internal/repositories"
 	"FitByte/pkg/log"
-	customErrors "FitByte/internal/errors"
 	"context"
 	"time"
 
@@ -16,6 +16,7 @@ type ActivityService interface {
 	CreateActivity(ctx context.Context, userID uint, req models.CreateActivityRequest) (*models.ActivityResponse, error)
 	UpdateActivity(ctx context.Context, userID uint, activityID string, req models.UpdateActivityRequest) (*models.ActivityResponse, error)
 	DeleteActivity(ctx context.Context, userID uint, activityID string) error
+	GetActivities(ctx context.Context, userID uint, params models.GetActivityParams) ([]models.ActivityResponse, error)
 }
 
 type activityService struct {
@@ -87,7 +88,7 @@ func (s *activityService) UpdateActivity(ctx context.Context, userID uint, activ
 	}
 
 	updates := make(map[string]interface{})
-	
+
 	// Track what fields are being updated for recalculation
 	var newActivityType string = existingActivity.ActivityType
 	var newDurationInMinutes int = existingActivity.DurationInMinutes
@@ -162,4 +163,27 @@ func (s *activityService) DeleteActivity(ctx context.Context, userID uint, activ
 		return err
 	}
 	return nil
+}
+
+func (s *activityService) GetActivities(ctx context.Context, userID uint, params models.GetActivityParams) ([]models.ActivityResponse, error) {
+	activities, err := s.activityRepo.GetActivities(ctx, userID, params)
+	if err != nil {
+		log.Logger.Error().Err(err).Msg("Failed to get activities from repository")
+		return nil, err
+	}
+
+	var responses []models.ActivityResponse
+	for _, activity := range activities {
+		responses = append(responses, models.ActivityResponse{
+			ActivityID:        activity.ActivityID,
+			ActivityType:      activity.ActivityType,
+			DoneAt:            activity.DoneAt,
+			DurationInMinutes: activity.DurationInMinutes,
+			CaloriesBurned:    activity.CaloriesBurned,
+			CreatedAt:         activity.CreatedAt,
+			UpdatedAt:         activity.UpdatedAt,
+		})
+	}
+
+	return responses, nil
 }

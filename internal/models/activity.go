@@ -9,12 +9,12 @@ import (
 // Activity represents the activity entity in the database
 type Activity struct {
 	gorm.Model
-	ActivityID          string    `json:"activityId" gorm:"uniqueIndex;not null"`
-	UserID              uint      `json:"-" gorm:"not null;index"`
-	ActivityType        string    `json:"activityType" gorm:"not null" validate:"required,oneof=Walking Yoga Stretching Cycling Swimming Dancing Hiking Running HIIT JumpRope"`
-	DoneAt              time.Time `json:"doneAt" gorm:"not null" validate:"required"`
-	DurationInMinutes   int       `json:"durationInMinutes" gorm:"not null" validate:"required,min=1"`
-	CaloriesBurned      int       `json:"caloriesBurned" gorm:"not null"`
+	ActivityID        string    `json:"activityId" gorm:"uniqueIndex;not null"`
+	UserID            uint      `json:"-" gorm:"not null;index"`
+	ActivityType      string    `json:"activityType" gorm:"not null" validate:"required,oneof=Walking Yoga Stretching Cycling Swimming Dancing Hiking Running HIIT JumpRope"`
+	DoneAt            time.Time `json:"doneAt" gorm:"not null" validate:"required"`
+	DurationInMinutes int       `json:"durationInMinutes" gorm:"not null" validate:"required,min=1"`
+	CaloriesBurned    int       `json:"caloriesBurned" gorm:"not null"`
 }
 
 // CreateActivityRequest represents the request body for creating an activity
@@ -54,4 +54,14 @@ var ActivityTypeCalories = map[string]int{
 	"Running":    10,
 	"HIIT":       10,
 	"JumpRope":   10,
+}
+
+type GetActivityParams struct {
+	Limit             int
+	Offset            int
+	ActivityType      string
+	DoneAtFrom        time.Time
+	DoneAtTo          time.Time
+	CaloriesBurnedMin int
+	CaloriesBurnedMax int
 }
