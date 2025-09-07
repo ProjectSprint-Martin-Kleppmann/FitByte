@@ -5,6 +5,7 @@ import (
 	"FitByte/internal/middleware"
 	"FitByte/internal/models"
 	"FitByte/internal/service"
+	"context"
 	"errors"
 	"net/http"
 
@@ -34,6 +35,10 @@ func (h *ProfileHandler) SetupRoutes() {
 	routes := h.Engine.Group("/v1")
 	routes.POST("register", h.Register)
 	routes.POST("login", h.Login)
+
+	protectedRoutes := h.Engine.Group("/v1")
+	protectedRoutes.Use(middleware.AuthMiddleware(h.AppConfig.Secret.JWTSecret))
+	protectedRoutes.PATCH("/user", h.UpdateProfile) 
 
 	// Protected routes
 	privateRoutes := h.Engine.Group("/health")
@@ -97,4 +102,89 @@ func (h *ProfileHandler) Login(c *gin.Context) {
 		"email": model.Email,
 		"token": token,
 	})
+}
+
+func (h *ProfileHandler) UpdateProfile(c *gin.Context) {
+	userIDInterface, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	userID := uint(userIDInterface.(int64))
+
+	var req models.PatchProfileRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	fieldMapping := map[string]struct {
+		dbField string
+		value   interface{}
+	}{
+		"Preference":  {"preference", getPtrValue(req.Preference)},
+		"WeightUnit":  {"weight_unit", getPtrValue(req.WeightUnit)},
+		"HeightUnit":  {"height_unit", getPtrValue(req.HeightUnit)},
+		"Weight":      {"weight", getPtrValue(req.Weight)},
+		"Height":      {"height", getPtrValue(req.Height)},
+		"Name":        {"name", getPtrValue(req.Name)},
+		"ImageUri":    {"image_uri", getPtrValue(req.ImageURI)},
+	}
+
+	updates := make(map[string]interface{})
+	for _, mapping := range fieldMapping {
+		if mapping.value != nil {
+			updates[mapping.dbField] = mapping.value
+		}
+	}
+
+	ctx := context.Background()
+	if err := h.ProfileSvc.UpdateUserProfile(ctx, userID, updates); err != nil {
+		if errors.Is(err, customErrors.ErrorUserNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update profile"})
+		return
+	}
+
+	profile, err := h.ProfileSvc.GetProfile(ctx, userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve profile"})
+		return
+	}
+	if profile == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	response := models.ProfileResponse{
+		Preference: profile.Preference,
+		WeightUnit: profile.WeightUnit,
+		HeightUnit: profile.HeightUnit,
+		Weight:     profile.Weight,
+		Height:     profile.Height,
+		Name:       profile.Name,
+		ImageURI:   profile.ImageURI,
+	}
+
+	c.JSON(http.StatusOK, response)
+}
+
+func getPtrValue(v interface{}) interface{} {
+	switch val := v.(type) {
+	case *string:
+		if val != nil {
+			return *val
+		}
+		return ""
+	case *float64:
+		if val != nil {
+			return *val
+		}
+		return 0.0
+	default:
+		return nil
+	}
 }

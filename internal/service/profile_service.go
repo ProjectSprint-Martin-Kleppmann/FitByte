@@ -8,6 +8,7 @@ import (
 	"FitByte/pkg/log"
 	"FitByte/pkg/token"
 	"context"
+	"strconv"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -15,6 +16,8 @@ import (
 type ProfileService interface {
 	Register(ctx context.Context, authRequest models.AuthRequest) (models.RegisterResponse, error)
 	Login(ctx context.Context, authRequest models.AuthRequest) (string, error)
+	UpdateUserProfile(ctx context.Context, userID uint, updates map[string]interface{}) error
+	GetProfile(ctx context.Context, userID uint) (*models.Profile, error)
 }
 
 type profileService struct {
@@ -95,4 +98,24 @@ func (u *profileService) Login(ctx context.Context, authRequest models.AuthReque
 	}
 
 	return signedToken, nil
+}
+
+func (u *profileService) UpdateUserProfile(ctx context.Context, userID uint, updates map[string]interface{}) error {
+	userProfile, err := u.profileRepo.GetProfileByID(ctx, userID)
+	if userProfile == nil {
+		log.Logger.Warn().Str("userID", strconv.FormatUint(uint64(userID), 10)).Msg("user not found")
+		return customErrors.ErrorUserNotFound
+	}
+
+	err = u.profileRepo.UpdateUser(ctx, userID, updates)
+	if err != nil {
+		log.Logger.Error().Err(err).Msg("error occurred on UpdateUserProfile(ctx context.Context, email string, updates map[string]interface{})")
+		return err
+	}
+
+	return nil
+}
+
+func (u *profileService) GetProfile(ctx context.Context, userID uint) (*models.Profile, error) {
+	return u.profileRepo.GetProfileByID(ctx, userID)
 }
