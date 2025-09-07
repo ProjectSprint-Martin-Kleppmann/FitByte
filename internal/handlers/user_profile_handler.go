@@ -5,6 +5,7 @@ import (
 	"FitByte/internal/middleware"
 	"FitByte/internal/models"
 	"FitByte/internal/service"
+	"context"
 	"errors"
 	"net/http"
 
@@ -34,6 +35,10 @@ func (h *ProfileHandler) SetupRoutes() {
 	routes := h.Engine.Group("/v1")
 	routes.POST("register", h.Register)
 	routes.POST("login", h.Login)
+
+	protectedRoutes := h.Engine.Group("/v1")
+	protectedRoutes.Use(middleware.AuthMiddleware(h.AppConfig.Secret.JWTSecret))
+	protectedRoutes.PATCH("/user", h.UpdateProfile) 
 
 	// Protected routes
 	privateRoutes := h.Engine.Group("/health")
@@ -97,4 +102,75 @@ func (h *ProfileHandler) Login(c *gin.Context) {
 		"email": model.Email,
 		"token": token,
 	})
+}
+
+func (h *ProfileHandler) UpdateProfile(c *gin.Context) {
+	userIDInterface, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	userID := uint(userIDInterface.(int64))
+
+	var req models.PatchProfileRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	fieldMapping := map[string]struct {
+		dbField string
+		value   interface{}
+	}{
+		"Preference":  {"preference", req.Preference},
+		"WeightUnit":  {"weight_unit", req.WeightUnit},
+		"HeightUnit":  {"height_unit", req.HeightUnit},
+		"Weight":      {"weight", req.Weight},
+		"Height":      {"height", req.Height},
+		"Name":        {"name", req.Name},
+		"ImageUri":    {"image_uri", req.ImageURI},
+	}
+
+	updates := make(map[string]interface{})
+	for _, mapping := range fieldMapping {
+		if mapping.value != nil {
+			updates[mapping.dbField] = mapping.value
+		}
+	}
+
+	ctx := context.Background()
+	if err := h.ProfileSvc.UpdateUserProfile(ctx, userID, updates); err != nil {
+		if errors.Is(err, customErrors.ErrorUserNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update profile"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"preference":  getStringValue(req.Preference),
+		"weightUnit":  getStringValue(req.WeightUnit),
+		"heightUnit":  getStringValue(req.HeightUnit),
+		"weight":      getFloat64Value(req.Weight),
+		"height":      getFloat64Value(req.Height),
+		"name":        getStringValue(req.Name),
+		"imageUri":    getStringValue(req.ImageURI),
+	})
+}
+
+// helper
+func getStringValue(ptr *string) string {
+	if ptr != nil {
+		return *ptr
+	}
+	return ""
+}
+
+func getFloat64Value(ptr *float64) float64 {
+	if ptr != nil {
+		return *ptr
+	}
+	return 0
 }
