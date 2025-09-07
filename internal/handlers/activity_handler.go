@@ -8,6 +8,9 @@ import (
 	"FitByte/internal/service"
 	"errors"
 	"net/http"
+	"strconv"
+	"time"
+
 	// "strconv"
 	// "time"
 
@@ -38,6 +41,7 @@ func (h *ActivityHandler) SetupRoutes() {
 	protectedRoutes.POST("/activity", h.CreateActivity)
 	protectedRoutes.PATCH("/activity/:activityId", h.UpdateActivity)
 	protectedRoutes.DELETE("/activity/:activityId", h.DeleteActivity)
+	protectedRoutes.GET("/activity", h.GetActivities)
 }
 
 func (h *ActivityHandler) CreateActivity(c *gin.Context) {
@@ -129,4 +133,60 @@ func (h *ActivityHandler) DeleteActivity(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Activity deleted successfully"})
+}
+
+func (h *ActivityHandler) GetActivities(c *gin.Context) {
+	userIDInterface, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+	userID := uint(userIDInterface.(int64))
+
+	limit, err := strconv.Atoi(c.DefaultQuery("limit", "5"))
+	if err != nil || limit < 0 {
+		limit = 5
+	}
+
+	offset, err := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	if err != nil || offset < 0 {
+		offset = 0
+	}
+
+	params := models.GetActivityParams{
+		Limit:        limit,
+		Offset:       offset,
+		ActivityType: c.Query("activityType"),
+	}
+
+	if doneAtFromStr := c.Query("doneAtFrom"); doneAtFromStr != "" {
+		if t, err := time.Parse(time.RFC3339, doneAtFromStr); err == nil {
+			params.DoneAtFrom = t
+		}
+	}
+	if doneAtToStr := c.Query("doneAtTo"); doneAtToStr != "" {
+		if t, err := time.Parse(time.RFC3339, doneAtToStr); err == nil {
+			params.DoneAtTo = t
+		}
+	}
+
+	if calMinStr := c.Query("caloriesBurnedMin"); calMinStr != "" {
+		if cal, err := strconv.Atoi(calMinStr); err == nil && cal > 0 {
+			params.CaloriesBurnedMin = cal
+		}
+	}
+	if calMaxStr := c.Query("caloriesBurnedMax"); calMaxStr != "" {
+		if cal, err := strconv.Atoi(calMaxStr); err == nil && cal > 0 {
+			params.CaloriesBurnedMax = cal
+		}
+	}
+
+	ctx := c.Request.Context()
+	activities, err := h.ActivitySvc.GetActivities(ctx, userID, params)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve activities"})
+		return
+	}
+
+	c.JSON(http.StatusOK, activities)
 }

@@ -14,6 +14,7 @@ type ActivityRepository interface {
 	GetActivityByID(ctx context.Context, activityID string, userID uint) (*models.Activity, error)
 	UpdateActivity(ctx context.Context, activityID string, userID uint, updates map[string]interface{}) error
 	DeleteActivity(ctx context.Context, activityID string, userID uint) error
+	GetActivities(ctx context.Context, userID uint, params models.GetActivityParams) ([]models.Activity, error)
 }
 
 type activityRepository struct {
@@ -79,4 +80,32 @@ func (r *activityRepository) DeleteActivity(ctx context.Context, activityID stri
 	}
 
 	return nil
+}
+func (r *activityRepository) GetActivities(ctx context.Context, userID uint, params models.GetActivityParams) ([]models.Activity, error) {
+	var activities []models.Activity
+	query := r.db.WithContext(ctx).Where("user_id = ?", userID)
+
+	if params.ActivityType != "" {
+		query = query.Where("activity_type = ?", params.ActivityType)
+	}
+	if !params.DoneAtFrom.IsZero() {
+		query = query.Where("done_at >= ?", params.DoneAtFrom)
+	}
+	if !params.DoneAtTo.IsZero() {
+		query = query.Where("done_at <= ?", params.DoneAtTo)
+	}
+	if params.CaloriesBurnedMin > 0 {
+		query = query.Where("calories_burned >= ?", params.CaloriesBurnedMin)
+	}
+	if params.CaloriesBurnedMax > 0 {
+		query = query.Where("calories_burned <= ?", params.CaloriesBurnedMax)
+	}
+
+	err := query.Offset(params.Offset).Limit(params.Limit).Find(&activities).Error
+	if err != nil {
+		log.Logger.Error().Err(err).Msg("Failed to get activities")
+		return nil, err
+	}
+	return activities, nil
+
 }
