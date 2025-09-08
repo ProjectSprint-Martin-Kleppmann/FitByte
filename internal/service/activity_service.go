@@ -14,6 +14,7 @@ import (
 
 type ActivityService interface {
 	CreateActivity(ctx context.Context, userID uint, req models.CreateActivityRequest) (*models.ActivityResponse, error)
+	GetActivities(ctx context.Context, userID uint, query models.GetActivitiesQuery) ([]models.ActivityResponse, error)
 	UpdateActivity(ctx context.Context, userID uint, activityID string, req models.UpdateActivityRequest) (*models.ActivityResponse, error)
 	DeleteActivity(ctx context.Context, userID uint, activityID string) error
 }
@@ -67,12 +68,43 @@ func (s *activityService) CreateActivity(ctx context.Context, userID uint, req m
 	return &models.ActivityResponse{
 		ActivityID:        activityID,
 		ActivityType:      req.ActivityType,
-		DoneAt:            doneAt,
+		DoneAt:            doneAt.Format(time.RFC3339),
 		DurationInMinutes: req.DurationInMinutes,
 		CaloriesBurned:    caloriesBurned,
 		CreatedAt:         now,
 		UpdatedAt:         now,
 	}, nil
+}
+
+func (s *activityService) GetActivities(ctx context.Context, userID uint, query models.GetActivitiesQuery) ([]models.ActivityResponse, error) {
+	// Set default pagination if not provided
+	if query.Limit <= 0 {
+		query.Limit = 5
+	}
+	if query.Offset < 0 {
+		query.Offset = 0
+	}
+
+	activities, err := s.activityRepo.GetActivitiesByUserID(ctx, userID, query)
+	if err != nil {
+		log.Logger.Error().Err(err).Msg("Failed to get activities")
+		return nil, err
+	}
+
+	responses := make([]models.ActivityResponse, len(activities))
+	for i, activity := range activities {
+		responses[i] = models.ActivityResponse{
+			ActivityID:        activity.ActivityID,
+			ActivityType:      activity.ActivityType,
+			DoneAt:            activity.DoneAt.Format(time.RFC3339),
+			DurationInMinutes: activity.DurationInMinutes,
+			CaloriesBurned:    activity.CaloriesBurned,
+			CreatedAt:         activity.CreatedAt,
+			UpdatedAt:         activity.UpdatedAt,
+		}
+	}
+
+	return responses, nil
 }
 
 func (s *activityService) UpdateActivity(ctx context.Context, userID uint, activityID string, req models.UpdateActivityRequest) (*models.ActivityResponse, error) {
@@ -141,10 +173,17 @@ func (s *activityService) UpdateActivity(ctx context.Context, userID uint, activ
 		return nil, err
 	}
 
+	// Use the original request doneAt format if it was provided, otherwise use the stored format
+	doneAtString := updatedActivity.DoneAt.Format(time.RFC3339)
+	if req.DoneAt != nil {
+		// If doneAt was updated, use the original request format
+		doneAtString = *req.DoneAt
+	}
+
 	return &models.ActivityResponse{
 		ActivityID:        updatedActivity.ActivityID,
 		ActivityType:      updatedActivity.ActivityType,
-		DoneAt:            updatedActivity.DoneAt,
+		DoneAt:            doneAtString,
 		DurationInMinutes: updatedActivity.DurationInMinutes,
 		CaloriesBurned:    updatedActivity.CaloriesBurned,
 		CreatedAt:         updatedActivity.CreatedAt,
@@ -163,3 +202,4 @@ func (s *activityService) DeleteActivity(ctx context.Context, userID uint, activ
 	}
 	return nil
 }
+

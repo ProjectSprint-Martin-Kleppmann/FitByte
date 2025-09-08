@@ -8,3 +8,4 @@ var (
 	ErrInvalidCredentials = errors.New("invalid credentials")
 	ErrActivityNotFound   = errors.New("activity not found")
 )
+				

@@ -5,11 +5,13 @@ import (
 	"FitByte/internal/middleware"
 	"FitByte/internal/models"
 	"FitByte/internal/service"
-	"context"
+
+	// "context"
 	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/go-playground/validator/v10"
 
 	customErrors "FitByte/internal/errors"
 )
@@ -32,13 +34,19 @@ func (h *ProfileHandler) SetupRoutes() {
 	// Health check
 	h.Engine.GET("/ping", h.pong)
 
+	// Add validation middleware to all routes
 	routes := h.Engine.Group("/v1")
+	routes.Use(middleware.ContentTypeMiddleware())
+	routes.Use(middleware.ValidationMiddleware())
 	routes.POST("register", h.Register)
 	routes.POST("login", h.Login)
 
 	protectedRoutes := h.Engine.Group("/v1")
+	protectedRoutes.Use(middleware.ContentTypeMiddleware())
+	protectedRoutes.Use(middleware.ValidationMiddleware())
 	protectedRoutes.Use(middleware.AuthMiddleware(h.AppConfig.Secret.JWTSecret))
-	protectedRoutes.PATCH("/user", h.UpdateProfile) 
+	protectedRoutes.GET("/user", h.GetProfile)
+	protectedRoutes.PATCH("/user", h.UpdateProfile)
 
 	// Protected routes
 	privateRoutes := h.Engine.Group("/health")
@@ -55,9 +63,20 @@ func (h *ProfileHandler) pong(c *gin.Context) {
 func (h *ProfileHandler) Register(c *gin.Context) {
 	var model models.AuthRequest
 	ctx := c.Request.Context()
+
 	err := c.ShouldBindJSON(&model)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	if middleware.HandleValidationError(c, err) {
+		return
+	}
+
+	validate, exists := c.Get("validator")
+	if !exists {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Validation service unavailable"})
+		return
+	}
+
+	if validationErrors := middleware.ValidateStruct(validate.(*validator.Validate), model); validationErrors != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"errors": validationErrors})
 		return
 	}
 
@@ -79,8 +98,18 @@ func (h *ProfileHandler) Login(c *gin.Context) {
 	ctx := c.Request.Context()
 
 	err := c.ShouldBindJSON(&model)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	if middleware.HandleValidationError(c, err) {
+		return
+	}
+
+	validate, exists := c.Get("validator")
+	if !exists {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Validation service unavailable"})
+		return
+	}
+
+	if validationErrors := middleware.ValidateStruct(validate.(*validator.Validate), model); validationErrors != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"errors": validationErrors})
 		return
 	}
 
@@ -104,6 +133,80 @@ func (h *ProfileHandler) Login(c *gin.Context) {
 	})
 }
 
+func (h *ProfileHandler) GetProfile(c *gin.Context) {
+	userIDInterface, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	userID := uint(userIDInterface.(int64))
+	ctx := c.Request.Context()
+
+	profile, err := h.ProfileSvc.GetProfile(ctx, userID)
+	if err != nil {
+		if errors.Is(err, customErrors.ErrorUserNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get profile"})
+		return
+	}
+
+	if profile == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	response := gin.H{
+		"email": profile.Email,
+	}
+
+	if profile.Preference == "" {
+		response["preference"] = nil
+	} else {
+		response["preference"] = profile.Preference
+	}
+
+	if profile.WeightUnit == "" {
+		response["weightUnit"] = nil
+	} else {
+		response["weightUnit"] = profile.WeightUnit
+	}
+
+	if profile.HeightUnit == "" {
+		response["heightUnit"] = nil
+	} else {
+		response["heightUnit"] = profile.HeightUnit
+	}
+
+	if profile.Weight == 0 {
+		response["weight"] = nil
+	} else {
+		response["weight"] = profile.Weight
+	}
+
+	if profile.Height == 0 {
+		response["height"] = nil
+	} else {
+		response["height"] = profile.Height
+	}
+
+	if profile.Name == "" {
+		response["name"] = nil
+	} else {
+		response["name"] = profile.Name
+	}
+
+	if profile.ImageURI == "" {
+		response["imageUri"] = nil
+	} else {
+		response["imageUri"] = profile.ImageURI
+	}
+
+	c.JSON(http.StatusOK, response)
+}
+
 func (h *ProfileHandler) UpdateProfile(c *gin.Context) {
 	userIDInterface, exists := c.Get("user_id")
 	if !exists {
@@ -114,32 +217,34 @@ func (h *ProfileHandler) UpdateProfile(c *gin.Context) {
 	userID := uint(userIDInterface.(int64))
 
 	var req models.PatchProfileRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+
+	err := c.ShouldBindJSON(&req)
+	if middleware.HandleValidationError(c, err) {
 		return
 	}
 
-	fieldMapping := map[string]struct {
-		dbField string
-		value   interface{}
-	}{
-		"Preference":  {"preference", req.Preference},
-		"WeightUnit":  {"weight_unit", req.WeightUnit},
-		"HeightUnit":  {"height_unit", req.HeightUnit},
-		"Weight":      {"weight", req.Weight},
-		"Height":      {"height", req.Height},
-		"Name":        {"name", req.Name},
-		"ImageUri":    {"image_uri", req.ImageURI},
+	validate, exists := c.Get("validator")
+	if !exists {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Validation service unavailable"})
+		return
 	}
 
-	updates := make(map[string]interface{})
-	for _, mapping := range fieldMapping {
-		if mapping.value != nil {
-			updates[mapping.dbField] = mapping.value
-		}
+	if validationErrors := middleware.ValidateStruct(validate.(*validator.Validate), req); validationErrors != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"errors": validationErrors})
+		return
 	}
 
-	ctx := context.Background()
+	updates := map[string]interface{}{
+		"preference":  req.Preference,
+		"weight_unit": req.WeightUnit,
+		"height_unit": req.HeightUnit,
+		"weight":      req.Weight,
+		"height":      req.Height,
+		"name":        req.Name,
+		"image_uri":   req.ImageURI,
+	}
+
+	ctx := c.Request.Context()
 	if err := h.ProfileSvc.UpdateUserProfile(ctx, userID, updates); err != nil {
 		if errors.Is(err, customErrors.ErrorUserNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
@@ -149,28 +254,15 @@ func (h *ProfileHandler) UpdateProfile(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"preference":  getStringValue(req.Preference),
-		"weightUnit":  getStringValue(req.WeightUnit),
-		"heightUnit":  getStringValue(req.HeightUnit),
-		"weight":      getFloat64Value(req.Weight),
-		"height":      getFloat64Value(req.Height),
-		"name":        getStringValue(req.Name),
-		"imageUri":    getStringValue(req.ImageURI),
-	})
-}
-
-// helper
-func getStringValue(ptr *string) string {
-	if ptr != nil {
-		return *ptr
+	response := gin.H{
+		"preference": req.Preference,
+		"weightUnit": req.WeightUnit,
+		"heightUnit": req.HeightUnit,
+		"weight":     req.Weight,
+		"height":     req.Height,
+		"name":       req.Name,
+		"imageUri":   req.ImageURI,
 	}
-	return ""
-}
 
-func getFloat64Value(ptr *float64) float64 {
-	if ptr != nil {
-		return *ptr
-	}
-	return 0
+	c.JSON(http.StatusOK, response)
 }

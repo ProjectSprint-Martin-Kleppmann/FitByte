@@ -55,7 +55,7 @@ func (u *profileService) Register(ctx context.Context, authRequest models.AuthRe
 		Password: string(hashedPassword),
 	}
 
-	err = u.profileRepo.CreateUser(ctx, userProfile)
+	err = u.profileRepo.CreateUser(ctx, &userProfile)
 	if err != nil {
 		log.Logger.Error().Err(err).Msg("error occurred on Register(ctx context.Context, authRequest models.AuthRequest")
 		return models.RegisterResponse{}, err
